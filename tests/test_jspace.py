@@ -18,6 +18,16 @@ CITATION = ROOT / "CITATION.cff"
 
 
 class JSpaceControllerTests(unittest.TestCase):
+    def test_advisory_ship_rejects_oversized_file_and_stdin_without_truncation(self):
+        path = Path(self.workspace.name) / 'large.txt'
+        limit = 8 * 1024 * 1024
+        path.write_bytes(b'a' * (limit + 1))
+        for result in (self.run_controller('ship', str(path)),
+                       self.run_controller_bytes('ship', '-', stdin=b'a' * (limit + 1))):
+            self.assertEqual(result.returncode, 2)
+            output = result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else result.stdout
+            self.assertIn('8 MiB advisory limit', output)
+
     def setUp(self):
         self.workspace = tempfile.TemporaryDirectory()
 
@@ -538,6 +548,7 @@ class JSpaceControllerTests(unittest.TestCase):
         )
         proc.stdout.close()
         stderr = proc.stderr.read()
+        proc.stderr.close()
         proc.wait()
         self.assertNotIn(b"Traceback", stderr)
         self.assertEqual(proc.returncode, 0)
@@ -842,7 +853,7 @@ class JSpaceControllerTests(unittest.TestCase):
     def test_citation_metadata_does_not_claim_an_unpublished_release(self):
         citation = CITATION.read_text(encoding="utf-8")
         self.assertNotIn("link to be added", citation)
-        self.assertRegex(citation, r'(?m)^version:\s*["\']?3\.7["\']?\s*$')
+        self.assertRegex(citation, r'(?m)^version:\s*["\']?SV1["\']?\s*$')
         self.assertIn("10.5281/zenodo.21971181", citation)
         self.assertNotRegex(citation, r"(?m)^doi:")
         self.assertNotRegex(citation, r"(?m)^date-released:")
